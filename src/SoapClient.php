@@ -57,9 +57,19 @@ class SoapClient extends \SoapClient
 
         // Verify that a user name and password were entered.
         if (empty($options['user']) || empty($options['password'])) {
-            throw new \BadMethodCallException(
-                'A username and password is required.'
-            );
+            // Check if we have an SSPI enabled libcurl
+            // see <curl/curl.h>, line ~2267 #define CURL_VERSION_SSPI         (1<<11)
+            /* Built against Windows SSPI */
+            if (!defined('CURL_VERSION_SSPI'))
+                define('CURL_VERSION_SSPI', (1<<11));
+            $cv = curl_version();
+            // Raise Exception if:
+            // No SSPI in curl/curl OR user:password not like expected by curl to use SSPI
+            // (see http://osdir.com/ml/web.curl.php/2008-05/msg00026.html for example)
+            if (($cv['features'] & CURL_VERSION_SSPI) === 0 || $options['user'].  ':' . $options['password'] !== ':')
+            {
+                throw new \BadMethodCallException('A username and password is required without SSPI support in Curl.');
+            }
         }
 
         parent::__construct($wsdl, $options);
